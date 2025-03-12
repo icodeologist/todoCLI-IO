@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"database/sql"
 	"fmt"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/olekukonko/tablewriter"
 )
 
 
@@ -26,7 +28,7 @@ type Tasks struct{
   Status bool
 }
 
-//delete the row user specifies for now
+//mark true the row user specifies for now
 func markCompleted(id int64) {
   _, err := db.Exec("UPDATE tasks SET status = ? WHERE id = ?", true, id)
   if err != nil{
@@ -66,14 +68,14 @@ func getTaskItems(id int64) (Tasks, error) {
 }
 
 
-func wholeDbFromLastEntry() ([]Tasks , error) {
+func wholeDbFromLastEntry() (string, error) {
   if db == nil{
     log.Fatal("Db connection not initialized")
   }
   var tasks []Tasks
   rows, err  := db.Query("SELECT * FROM tasks ORDER BY id DESC")
   if  err != nil{
-    return nil, fmt.Errorf("wholeDbFromLastEntry: %v", err)
+    return "", fmt.Errorf("wholeDbFromLastEntry: %v", err)
   } 
   defer rows.Close()
 
@@ -81,17 +83,32 @@ func wholeDbFromLastEntry() ([]Tasks , error) {
     var t Tasks
     if err := rows.Scan(&t.ID, &t.Name, &t.Status); err != nil{
 
-      return nil, fmt.Errorf("wholeDbFromLastEntry row loop: %v", err)
+      return "", fmt.Errorf("wholeDbFromLastEntry row loop: %v", err)
     }
     tasks = append(tasks, t)
 
   }
   // if errors occured during iterations
   if err := rows.Err(); err != nil{
-    return nil, fmt.Errorf("error during iterations : %v", err)
+    return "", fmt.Errorf("error during iterations : %v", err)
 
   }
-  return tasks, nil
+  var buf bytes.Buffer
+  table := tablewriter.NewWriter(&buf)
+
+  table.SetHeader([]string{"Task Name", "Completed"})
+
+  for t, s := range tasks{
+    if s.Name == ""{
+      continue
+    }
+    
+    table.Append([]string{s.Name, fmt.Sprintf("%v", s.Status) })
+    fmt.Println("t", t)
+    fmt.Println("s", s)
+  }
+  table.Render()
+  return buf.String(), nil
 }
    
 
@@ -122,10 +139,10 @@ func main(){
   fmt.Println("Connected")
 
 
-  //TODO Have a better system 
+  // Have a better system 
   //for now whether user want to create or update db
   reader := bufio.NewReader(os.Stdin)
-  //TODO add cool tasks --help thing
+  // add cool tasks --help thing
   //NOTE user input for displaying usage options 
   fmt.Print("Enter tasks --help or y/n to use the program thank you: ")
   val, _ := reader.ReadString('\n')
@@ -146,7 +163,9 @@ func main(){
   if val == "y"{
     fmt.Println(taksGuide)
   }else{
-    fmt.Println("There is a error here")
+    fmt.Println("Program Exited")
+    return
+
   }
   //Get user input to create tasks
   //NOTE user input for Usage optiongs
@@ -158,7 +177,7 @@ func main(){
   //for create or c
   switch valAgain {
   case "c":
-    //TODO user input here again for task name
+    // user input here again for task name
     //IF user enter c then we need to get the name of tasks that the 
     //user want to create"
     //NOTE Probably last one for task names
@@ -212,9 +231,6 @@ func main(){
       log.Fatal(err)
     }
     fmt.Println(updatedData)
-    
-
-
   default: 
     fmt.Println("Tafkdkjsfkdsj")
 
@@ -222,18 +238,12 @@ func main(){
 
 
 
-  
-  //TODO addTHis needs to be user input
-  // taskID , err := addNewTasks(addThis)
-  // if err != nil{
-  //   fmt.Errorf("ERRORL %v", err)
-  //   return
-  // }
-  // fmt.Println("Task added with id: ",taskID)
-  // data, err := getTaskItems(taskID)
-  // if err != nil{
-  //   fmt.Errorf("ERRORL %v", err)
-  // }
-  // fmt.Println("This is data", data)
-  //
+
 }
+
+
+
+
+//TODO 
+//Return the db with nice formatted way Idk json maybe
+//Fix some logic while user experience thats it
